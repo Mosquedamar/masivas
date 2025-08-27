@@ -1,0 +1,416 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Demo Recargas Masivas Mejorado</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+body { font-family:'Roboto',sans-serif; background:#f0f2f5; margin:0; padding:0;}
+.container { max-width:1000px; margin:30px auto; padding:0 20px;}
+h2 { text-align:center; color:#2c3e50; margin-bottom:20px;}
+button { background:#3498db; color:#fff; border:none; padding:10px 18px; border-radius:8px; font-size:14px; cursor:pointer; font-weight:500; margin:5px; }
+button:hover { background:#2980b9; }
+.tabs { margin-bottom:15px; }
+.tabs button { border:none; background:#ccc; margin-right:5px; }
+.tabs button.active { background:#2980b9; color:#fff; }
+.modal { display:none; position:fixed; top:0; left:0; width:100%; height:100%; background: rgba(0,0,0,0.5); justify-content:center; align-items:center; z-index:100;}
+.modal-content { background:#fff; padding:25px; border-radius:12px; width:95%; max-width:700px; position:relative; box-shadow:0 4px 15px rgba(0,0,0,0.2); max-height:90%; overflow:auto;}
+.close { position:absolute; top:15px; right:20px; font-size:22px; font-weight:bold; cursor:pointer; color:#333; }
+input[type=file], select, input[type=datetime-local] { width:100%; padding:10px; margin-top:5px; border-radius:6px; border:1px solid #ccc; margin-bottom:10px; }
+.progress-container { background:#ddd; border-radius:12px; height:30px; margin-top:20px; overflow:hidden; }
+.progress-bar { height:100%; width:0%; background:#3498db; transition: width 0.3s; text-align:center; color:#fff; line-height:30px; }
+.summary-cards { display:flex; justify-content:space-around; margin-top:20px; flex-wrap:wrap; }
+.card { background:#f9f9f9; border-radius:12px; padding:15px 20px; text-align:center; width:30%; margin-bottom:10px; box-shadow:0 2px 6px rgba(0,0,0,0.1); }
+.card h3 { margin:5px 0; font-size:18px; }
+.ok { color:#27ae60; } .error { color:#e74c3c; } .dup { color:#f39c12; }
+.historialCard { border-radius:12px; padding:15px; margin-bottom:12px; box-shadow:0 2px 10px rgba(0,0,0,0.15);}
+.historialCard h4 { margin:0 0 8px 0; display:flex; justify-content:space-between; align-items:center; font-size:16px; }
+.detalles { display:none; max-height:250px; overflow:auto; margin-top:10px; }
+.resaltado { background:yellow; font-weight:bold; }
+.paginationBtn { background:#7f8c8d; margin:3px; }
+.paginationBtn:disabled { background:#ccc; cursor:default; }
+.carrier-telcel { background:#d6eaf8; border-left:5px solid #3498db; padding:10px; border-radius:8px; margin-bottom:10px;}
+.carrier-att { background:#d0e3f0; border-left:5px solid #2980b9; padding:10px; border-radius:8px; margin-bottom:10px;}
+.carrier-movistar { background:#d4efdf; border-left:5px solid #27ae60; padding:10px; border-radius:8px; margin-bottom:10px;}
+#buscarNumero { width:300px; padding:10px 15px; border-radius:25px; border:1px solid #ccc; box-shadow:0 4px 8px rgba(0,0,0,0.15); font-size:14px; transition:0.3s; }
+#buscarNumero:focus { outline:none; border-color:#3498db; box-shadow:0 4px 12px rgba(52,152,219,0.4); }
+#buscadorModal { text-align:center; margin-bottom:15px; }
+#duplicadosList { margin-top:10px; background:#f39c12; color:#fff; padding:10px; border-radius:8px; display:none; }
+</style>
+</head>
+<body>
+<div class="container">
+<h2>📱 Demo Recargas Masivas Mejorado</h2>
+<button id="nuevaRecargaBtn">+ Nueva Recarga</button>
+
+<div class="tabs">
+  <button id="tabProgramadasBtn" class="active">Recargas Programadas</button>
+  <button id="tabHistorialBtn">Historial de Recargas</button>
+</div>
+
+<div id="panelProgramadas">
+  <h3>Recargas Programadas</h3>
+  <div id="programadasList"></div>
+</div>
+
+<div id="panelHistorial" style="display:none;">
+  <h3>Historial de Recargas Ejecutadas</h3>
+  <div id="buscadorModal">
+    <input type="text" id="buscarNumero" placeholder="🔎 Buscar número...">
+  </div>
+  <div id="historialContainer"></div>
+</div>
+
+<div class="modal" id="recargaModal">
+  <div class="modal-content">
+    <span class="close" id="cerrarModal">&times;</span>
+    <h3>Recarga Masiva</h3>
+
+    <label for="fileInput">Subir Excel con números:</label>
+    <input type="file" id="fileInput" accept=".xlsx, .xls, .csv">
+
+    <div id="duplicadosList"></div>
+
+    <label for="carrier">Carrier:</label>
+    <select id="carrier">
+      <option value="Telcel">Telcel</option>
+      <option value="AT&T">AT&T</option>
+      <option value="Movistar">Movistar</option>
+    </select>
+
+    <label for="tipoRecarga">Tipo de recarga:</label>
+    <select id="tipoRecarga">
+      <option value="Recarga">Recarga</option>
+      <option value="PaqueteDatos">Paquete de datos</option>
+    </select>
+
+    <label for="monto">Monto / Paquete:</label>
+    <select id="monto">
+      <option value="50">$50</option>
+      <option value="100">$100</option>
+      <option value="200">$200</option>
+      <option value="500">$500</option>
+    </select>
+
+    <label><input type="checkbox" id="programarCheck"> Programar recarga</label>
+    <input type="datetime-local" id="fechaProgramada" style="display:none;">
+
+    <button id="iniciarRecargaBtn">Iniciar Recarga</button>
+
+    <div class="progress-container" id="progressContainer">
+      <div class="progress-bar" id="progressBar"></div>
+    </div>
+
+    <div class="summary-cards" id="summaryCards" style="display:none;">
+      <div class="card ok"><h3 id="exitosCount">0</h3>Éxitos</div>
+      <div class="card error"><h3 id="erroresCount">0</h3>Errores</div>
+      <div class="card dup"><h3 id="duplicadosCount">0</h3>Duplicados</div>
+    </div>
+
+    <button id="descargarBtn" style="display:none;">⬇ Descargar Resultados de este archivo</button>
+  </div>
+</div>
+
+<script>
+let numeros=[], numerosUnicos=[], resultados=[], recargasProgramadas=[], historialEjecutadas=[], archivoActual="";
+let numerosDuplicadosMap = {};
+let paginaActual = 1;
+const ITEMS_POR_PAGINA = 5;
+
+// --- Persistencia ---
+function guardarEnLocalStorage() {
+  localStorage.setItem("historialEjecutadas", JSON.stringify(historialEjecutadas));
+  localStorage.setItem("recargasProgramadas", JSON.stringify(recargasProgramadas));
+}
+
+window.addEventListener("load", () => {
+  historialEjecutadas = JSON.parse(localStorage.getItem("historialEjecutadas") || "[]");
+  recargasProgramadas = JSON.parse(localStorage.getItem("recargasProgramadas") || "[]");
+  actualizarListaProgramadas();
+  actualizarHistorialVisual();
+});
+
+// --- Modal ---
+const modal = document.getElementById("recargaModal");
+document.getElementById("nuevaRecargaBtn").addEventListener("click", ()=> {
+  numeros=[]; numerosUnicos=[]; resultados=[]; archivoActual=""; numerosDuplicadosMap={};
+  document.getElementById('fileInput').value='';
+  document.getElementById("progressBar").style.width="0%";
+  document.getElementById("summaryCards").style.display="none";
+  document.getElementById("descargarBtn").style.display="none";
+  document.getElementById("duplicadosList").style.display="none";
+  modal.style.display="flex";
+});
+document.getElementById("cerrarModal").addEventListener("click", ()=>{ modal.style.display="none"; });
+window.addEventListener("click", (e)=>{ if(e.target==modal) modal.style.display="none"; });
+
+// --- Tipo recarga según carrier ---
+const tipoRecargaSelect = document.getElementById("tipoRecarga");
+document.getElementById("carrier").addEventListener("change", ()=>{
+  const carrier = document.getElementById("carrier").value;
+  if(carrier==="Telcel"){ tipoRecargaSelect.innerHTML='<option value="Recarga">Recarga</option><option value="PaqueteDatos">Paquete de datos</option>'; tipoRecargaSelect.disabled=false;}
+  else { tipoRecargaSelect.innerHTML='<option value="Recarga">Recarga</option>'; tipoRecargaSelect.disabled=true;}
+});
+
+// --- Programar recarga ---
+const programarCheck = document.getElementById("programarCheck");
+const fechaProgramadaInput = document.getElementById("fechaProgramada");
+programarCheck.addEventListener("change", ()=>{ fechaProgramadaInput.style.display = programarCheck.checked ? 'block':'none'; });
+
+// --- Cargar archivo Excel ---
+document.getElementById('fileInput').addEventListener('change', function(e){
+  const file = e.target.files[0]; if(!file) return;
+  archivoActual = file.name;
+  const reader = new FileReader();
+  reader.onload = function(e){
+    const data = new Uint8Array(e.target.result);
+    const workbook = XLSX.read(data,{type:'array'});
+    const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+    const jsonData = XLSX.utils.sheet_to_json(firstSheet,{header:1});
+    numeros = jsonData.map(row=>row[0]).filter(v=>v && /^\d+$/.test(v));
+    numerosUnicos=[]; numerosDuplicadosMap={};
+    const seen = new Set();
+    numeros.forEach(num=>{
+      if(seen.has(num)) numerosDuplicadosMap[num]=true;
+      else { seen.add(num); numerosUnicos.push(num); }
+    });
+    document.getElementById("duplicadosList").style.display = Object.keys(numerosDuplicadosMap).length ? "block" : "none";
+    document.getElementById("duplicadosList").textContent = Object.keys(numerosDuplicadosMap).length ? "Duplicados detectados: "+Object.keys(numerosDuplicadosMap).join(", ") : "";
+    alert(`Archivo cargado: ${numerosUnicos.length} únicos, ${Object.keys(numerosDuplicadosMap).length} duplicados ignorados.`);
+    document.getElementById("duplicadosCount").textContent = Object.keys(numerosDuplicadosMap).length;
+    document.getElementById("exitosCount").textContent=0;
+    document.getElementById("erroresCount").textContent=0;
+    document.getElementById("summaryCards").style.display="flex";
+  };
+  reader.readAsArrayBuffer(file);
+});
+
+// --- Ejecutar recarga ---
+function ejecutarRecarga(carrier,tipoRecarga,monto,numerosAEjecutar,programada=false, grupoId=null){
+  const total = numerosAEjecutar.length;
+  const progressBar = document.getElementById("progressBar");
+  document.getElementById("progressContainer").style.display="block";
+  let exitos=0, errores=0, duplicadosCount=0, index=0;
+  if(!grupoId) grupoId = Date.now() + Math.random();
+  const interval = setInterval(()=>{
+    if(index<total){
+      const numero=numerosAEjecutar[index];
+      let estado;
+      if(numerosDuplicadosMap[numero]){
+        estado="Duplicado"; duplicadosCount++;
+      } else {
+        const exito=Math.random()>0.3;
+        estado = exito ? "Éxito" : "Error";
+        if(exito) exitos++; else errores++;
+      }
+      resultados.push({Número:numero,Carrier:carrier,Tipo:tipoRecarga,Monto:monto,Estado:estado,Fecha:new Date().toLocaleString(),Archivo:archivoActual,FechaProgramada:programada,GrupoID:grupoId});
+      historialEjecutadas.push(resultados[resultados.length-1]);
+      guardarEnLocalStorage();
+      index++;
+      progressBar.style.width=((index)/total*100)+"%";
+      progressBar.textContent=Math.round((index)/total*100)+"%";
+      document.getElementById("exitosCount").textContent = exitos;
+      document.getElementById("erroresCount").textContent = errores;
+      document.getElementById("duplicadosCount").textContent = duplicadosCount;
+    } else { 
+      clearInterval(interval); 
+      document.getElementById("descargarBtn").style.display="block"; 
+      actualizarHistorialVisual();
+      alert(`✅ Recarga completada. Revisa el historial.`); 
+    }
+  },100);
+}
+
+// --- Iniciar recarga ---
+document.getElementById("iniciarRecargaBtn").addEventListener("click", ()=>{
+  const carrier=document.getElementById('carrier').value;
+  const tipoRecarga=document.getElementById('tipoRecarga').value;
+  const monto=document.getElementById('monto').value;
+  if(!numerosUnicos.length){ alert("Sube un archivo primero"); return; }
+
+  if(programarCheck.checked && fechaProgramadaInput.value){
+    const fecha = new Date(fechaProgramadaInput.value);
+    if(fecha<=new Date()){ alert("La fecha debe ser futura."); return; }
+    const grupoId = Date.now() + Math.random();
+    recargasProgramadas.push({id:grupoId,carrier,tipoRecarga,monto,numeros:numerosUnicos,fecha,GrupoID:grupoId});
+    numerosUnicos.forEach(num => {
+      const estado = numerosDuplicadosMap[num] ? "Duplicado" : "Programada";
+      historialEjecutadas.push({Número:num,Carrier:carrier,Tipo:tipoRecarga,Monto:monto,Estado:estado,Fecha:fecha.toLocaleString(),Archivo:archivoActual,FechaProgramada:true,GrupoID:grupoId});
+    });
+    guardarEnLocalStorage();
+    actualizarListaProgramadas();
+    actualizarHistorialVisual();
+    const diff = fecha - new Date();
+    setTimeout(()=>{
+      const resultadosEjecutados = numerosUnicos.map(num => {
+        const exito = Math.random() > 0.3;
+        return {Número:num,Carrier:carrier,Tipo:tipoRecarga,Monto:monto,Estado:numerosDuplicadosMap[num]?"Duplicado":(exito?"Éxito":"Error"),Fecha:new Date().toLocaleString(),Archivo:archivoActual,FechaProgramada:true,GrupoID:grupoId};
+      });
+      historialEjecutadas = historialEjecutadas.filter(r=>r.GrupoID!==grupoId);
+      historialEjecutadas.push(...resultadosEjecutados);
+      recargasProgramadas = recargasProgramadas.filter(r=>r.id!==grupoId);
+      guardarEnLocalStorage();
+      actualizarListaProgramadas();
+      actualizarHistorialVisual();
+      alert(`✅ Recarga programada ejecutada. Revisa el Historial de Recargas.`);
+    }, diff);
+    alert(`Recarga programada para ${fecha.toLocaleString()}`);
+    modal.style.display="none";
+  } else {
+    ejecutarRecarga(carrier,tipoRecarga,monto,numerosUnicos,false);
+  }
+});
+
+// --- Lista programadas ---
+function actualizarListaProgramadas(){
+  const div = document.getElementById("programadasList");
+  div.innerHTML="";
+  recargasProgramadas.forEach(r=>{
+    const p=document.createElement("div"); p.className="historial-item";
+    p.innerHTML=`<span>${r.carrier} - ${r.tipoRecarga} - $${r.monto} - ${new Date(r.fecha).toLocaleString()}</span>
+                 <button class="cancelBtn" onclick="cancelarProgramada(${r.id})">Cancelar</button>`;
+    div.appendChild(p);
+  });
+}
+function cancelarProgramada(id){ 
+  recargasProgramadas = recargasProgramadas.filter(r=>r.id!==id); 
+  guardarEnLocalStorage();
+  actualizarListaProgramadas(); 
+}
+
+// --- Tabs ---
+document.getElementById("tabProgramadasBtn").addEventListener("click", ()=>{
+  document.getElementById("panelProgramadas").style.display="block";
+  document.getElementById("panelHistorial").style.display="none";
+  document.getElementById("tabProgramadasBtn").classList.add("active");
+  document.getElementById("tabHistorialBtn").classList.remove("active");
+});
+document.getElementById("tabHistorialBtn").addEventListener("click", ()=>{
+  document.getElementById("panelProgramadas").style.display="none";
+  document.getElementById("panelHistorial").style.display="block";
+  document.getElementById("tabProgramadasBtn").classList.remove("active");
+  document.getElementById("tabHistorialBtn").classList.add("active");
+  actualizarHistorialVisual();
+});
+
+// --- Historial visual ---
+function actualizarHistorialVisual() {
+  const container = document.getElementById("historialContainer");
+  container.innerHTML = "";
+  const buscarNumero = document.getElementById("buscarNumero").value.trim();
+
+  const grupos = [];
+  const idMap = {};
+  historialEjecutadas.forEach(r=>{
+    if(!idMap[r.GrupoID]) { idMap[r.GrupoID] = {archivo:r.Archivo, tipo:r.FechaProgramada?"Programada":"Inmediata", carrier:r.Carrier, items:[]}; grupos.push(idMap[r.GrupoID]); }
+    idMap[r.GrupoID].items.push(r);
+  });
+
+  const gruposFiltrados = grupos.filter(grupo=>{
+    if(!buscarNumero) return true;
+    return grupo.items.some(i => String(i.Número).includes(buscarNumero));
+  });
+
+  const totalPaginas = Math.ceil(gruposFiltrados.length / ITEMS_POR_PAGINA);
+  if(paginaActual>totalPaginas) paginaActual=totalPaginas || 1;
+  const start = (paginaActual - 1) * ITEMS_POR_PAGINA;
+  const end = start + ITEMS_POR_PAGINA;
+  const gruposPagina = gruposFiltrados.slice(start, end);
+
+  gruposPagina.forEach(grupo => {
+    const card = document.createElement("div");
+    card.className = "historialCard " + 
+      (grupo.carrier==="Telcel"?"carrier-telcel":grupo.carrier==="AT&T"?"carrier-att":"carrier-movistar");
+    const icono = grupo.tipo==="Programada"?"⏰":"🟢";
+    const exitos = grupo.items.filter(i=>i.Estado==="Éxito").length;
+    const errores = grupo.items.filter(i=>i.Estado==="Error").length;
+    const duplicados = grupo.items.filter(i=>i.Estado==="Duplicado").length;
+
+    const detallesHTML = `
+      <table style="width:100%; border-collapse:collapse;">
+        <thead>
+          <tr>
+            <th style="border-bottom:1px solid #ccc; padding:5px">Número</th>
+            <th style="border-bottom:1px solid #ccc; padding:5px">Carrier</th>
+            <th style="border-bottom:1px solid #ccc; padding:5px">Tipo</th>
+            <th style="border-bottom:1px solid #ccc; padding:5px">Monto</th>
+            <th style="border-bottom:1px solid #ccc; padding:5px">Estado</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${grupo.items.map(i=>{
+            let numeroMostrado = String(i.Número);
+            if(buscarNumero && numeroMostrado.includes(buscarNumero)){
+              numeroMostrado = `<span class="resaltado">${numeroMostrado}</span>`;
+            }
+            let colorEstado = i.Estado==="Éxito"?"#27ae60":i.Estado==="Error"?"#e74c3c":"#f39c12";
+            let bg = i.Estado==="Duplicado" ? "background:yellow;" : "";
+            return `<tr style="${bg}">
+              <td style="padding:5px">${numeroMostrado}</td>
+              <td style="padding:5px">${i.Carrier}</td>
+              <td style="padding:5px">${i.Tipo}</td>
+              <td style="padding:5px">$${i.Monto}</td>
+              <td style="padding:5px; color:${colorEstado}; font-weight:bold;">${i.Estado}</td>
+            </tr>`;
+          }).join('')}
+        </tbody>
+      </table>
+    `;
+
+    card.innerHTML = `<h4>${icono} ${grupo.archivo} - ${grupo.tipo} - ${grupo.carrier}</h4>
+      <p>Total: ${grupo.items.length} | ✅ ${exitos} | ❌ ${errores} | ⚠ ${duplicados}</p>
+      <button onclick="toggleDetalles(this)">Ver detalles</button>
+      <button onclick='descargarResultados(${JSON.stringify(grupo.items)})'>⬇ Descargar</button>
+      <div class="detalles">${detallesHTML}</div>`;
+
+    container.appendChild(card);
+  });
+
+  const paginacionDiv = document.createElement("div");
+  paginacionDiv.style.textAlign = "center";
+  paginacionDiv.style.marginTop = "10px";
+
+  const btnPrev = document.createElement("button");
+  btnPrev.textContent = "⬅ Anterior";
+  btnPrev.disabled = paginaActual === 1;
+  btnPrev.className="paginationBtn";
+  btnPrev.onclick = () => { paginaActual--; actualizarHistorialVisual(); };
+
+  const btnNext = document.createElement("button");
+  btnNext.textContent = "Siguiente ➡";
+  btnNext.disabled = paginaActual === totalPaginas || totalPaginas === 0;
+  btnNext.className="paginationBtn";
+  btnNext.onclick = () => { paginaActual++; actualizarHistorialVisual(); };
+
+  const pageInfo = document.createElement("span");
+  pageInfo.textContent = ` Página ${paginaActual} de ${totalPaginas} `;
+  pageInfo.style.margin = "0 10px";
+
+  paginacionDiv.appendChild(btnPrev);
+  paginacionDiv.appendChild(pageInfo);
+  paginacionDiv.appendChild(btnNext);
+
+  container.appendChild(paginacionDiv);
+}
+
+// --- Toggle detalles ---
+function toggleDetalles(btn){
+  const div = btn.nextElementSibling.nextElementSibling;
+  div.style.display = div.style.display === "none" ? "block" : "none";
+}
+
+// --- Descargar resultados ---
+function descargarResultados(items){
+  const wb = XLSX.utils.book_new();
+  const ws = XLSX.utils.json_to_sheet(items);
+  XLSX.utils.book_append_sheet(wb, ws, "Resultados");
+  const nombre = items[0].Archivo.replace(/\.[^/.]+$/,"") + "_" + (items[0].FechaProgramada?"programada":"inmediata") + "_resultados.xlsx";
+  XLSX.writeFile(wb, nombre);
+}
+
+// --- Buscar número ---
+document.getElementById("buscarNumero").addEventListener("input", ()=>{ paginaActual=1; actualizarHistorialVisual(); });
+</script>
+</body>
+</html>
