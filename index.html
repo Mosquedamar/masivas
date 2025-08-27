@@ -1,0 +1,533 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Demo Recargas Masivas Completo</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+body { font-family:'Roboto',sans-serif; background:#f0f2f5; margin:0; padding:0;}
+.container { max-width:1000px; margin:30px auto; padding:0 20px;}
+h2 { text-align:center; color:#2c3e50; margin-bottom:20px;}
+button { background:#3498db; color:#fff; border:none; padding:10px 18px; border-radius:8px; font-size:14px; cursor:pointer; font-weight:500; margin:5px; }
+button:hover { background:#2980b9; }
+.tabs { margin-bottom:15px; }
+.tabs button { border:none; background:#ccc; margin-right:5px; }
+.tabs button.active { background:#2980b9; color:#fff; }
+.modal { display:none; position:fixed; top:0; left:0; width:100%; height:100%; background: rgba(0,0,0,0.5); justify-content:center; align-items:center; z-index:100;}
+.modal-content { background:#fff; padding:25px; border-radius:12px; width:95%; max-width:700px; position:relative; box-shadow:0 4px 15px rgba(0,0,0,0.2); max-height:90%; overflow:auto;}
+.close { position:absolute; top:15px; right:20px; font-size:22px; font-weight:bold; cursor:pointer; color:#333; }
+input[type=file], select, input[type=datetime-local], input[type=text], input[type=password] { width:100%; padding:10px; margin-top:5px; border-radius:6px; border:1px solid #ccc; margin-bottom:10px; }
+.progress-container { background:#ddd; border-radius:12px; height:30px; margin-top:20px; overflow:hidden; }
+.progress-bar { height:100%; width:0%; background:#3498db; transition: width 0.3s; }
+.summary-cards { display:flex; justify-content:space-around; margin-top:20px; flex-wrap:wrap; }
+.card { background:#f9f9f9; border-radius:12px; padding:15px 20px; text-align:center; width:30%; margin-bottom:10px; box-shadow:0 2px 6px rgba(0,0,0,0.1); }
+.card h3, .card h4 { margin:5px 0; font-size:18px; }
+.ok { color:#27ae60; } .error { color:#e74c3c; } .dup { color:#f39c12; }
+.historialCard { border-radius:12px; padding:15px; margin-bottom:12px; box-shadow:0 2px 10px rgba(0,0,0,0.15);}
+.historialCard h4 { margin:0 0 8px 0; display:flex; justify-content:space-between; align-items:center; font-size:16px; }
+.detalles { display:none; max-height:250px; overflow:auto; margin-top:10px; }
+.resaltado { background:yellow; font-weight:bold; }
+.paginationBtn { background:#7f8c8d; margin:3px; }
+.paginationBtn:disabled { background:#ccc; cursor:default; }
+.carrier-telcel { background:#d6eaf8; border-left:5px solid #3498db; padding:10px; border-radius:8px; margin-bottom:10px;}
+.carrier-att { background:#d0e3f0; border-left:5px solid #2980b9; padding:10px; border-radius:8px; margin-bottom:10px;}
+.carrier-movistar { background:#d4efdf; border-left:5px solid #27ae60; padding:10px; border-radius:8px; margin-bottom:10px;}
+#buscarNumero { width:300px; padding:10px 15px; border-radius:25px; border:1px solid #ccc; box-shadow:0 4px 8px rgba(0,0,0,0.15); font-size:14px; transition:0.3s; }
+#buscarNumero:focus { outline:none; border-color:#3498db; box-shadow:0 4px 12px rgba(52,152,219,0.4); }
+#buscadorModal { text-align:center; margin-bottom:15px; }
+
+/* Botón flotante Cerrar Sesión */
+#logoutBtn { 
+  position:fixed;
+  top:20px;
+  right:20px;
+  background:#e74c3c;
+  color:#fff;
+  border:none;
+  padding:12px 18px;
+  border-radius:50px;
+  cursor:pointer;
+  font-weight:500;
+  box-shadow:0 4px 12px rgba(0,0,0,0.25);
+  display:none;
+  z-index:1000;
+}
+
+/* Estilos de modal de usuarios */
+#usuariosAdminList div { display:flex; justify-content:space-between; align-items:center; margin-bottom:5px; }
+#usuariosAdminList button { padding:5px 8px; font-size:12px; }
+#usuariosAdminList input[type=password] { width:120px; margin-right:5px; }
+
+</style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div id="loginContainer" style="display:flex; justify-content:center; align-items:center; height:100vh; background:#f0f2f5;">
+  <div style="background:#fff; padding:40px; border-radius:12px; box-shadow:0 4px 15px rgba(0,0,0,0.2); width:300px; text-align:center;">
+    <h2>🔑 Iniciar Sesión</h2>
+    <input type="text" id="username" placeholder="Usuario">
+    <input type="password" id="password" placeholder="Contraseña">
+    <button id="loginBtn">Iniciar Sesión</button>
+    <p id="loginError" style="color:red; display:none; margin-top:10px;">Usuario o contraseña incorrectos</p>
+  </div>
+</div>
+
+<!-- CONTENIDO PRINCIPAL -->
+<div class="container" id="mainContainer" style="display:none;">
+<h2>📱 Demo Recargas Masivas Mejorado</h2>
+
+<button id="nuevaRecargaBtn">+ Nueva Recarga</button>
+
+<!-- ADMIN PANEL -->
+<div id="adminPanel" style="display:none; margin-top:20px; padding:15px; background:#ecf0f1; border-radius:12px;">
+<h3>⚙ Administración de Usuarios</h3>
+<button id="crearUsuarioBtn">Administrar Usuarios</button>
+</div>
+
+<!-- PANEL DE ESTADÍSTICAS -->
+<div id="adminStats" style="display:none; margin-top:20px; padding:15px; background:#ecf0f1; border-radius:12px;">
+<h3>📊 Estadísticas de Recargas</h3>
+<div style="display:flex; justify-content:space-around; flex-wrap:wrap; margin-top:10px;">
+<div class="card" style="background:#d6eaf8; width:30%;"><h4>Telcel</h4><p id="totalTelcel">0</p></div>
+<div class="card" style="background:#d0e3f0; width:30%;"><h4>AT&T</h4><p id="totalATT">0</p></div>
+<div class="card" style="background:#d4efdf; width:30%;"><h4>Movistar</h4><p id="totalMovistar">0</p></div>
+</div>
+</div>
+
+<!-- TABS DE RECARGAS -->
+<div class="tabs">
+  <button id="tabProgramadasBtn" class="active">Recargas Programadas</button>
+  <button id="tabHistorialBtn">Historial de Recargas</button>
+</div>
+
+<div id="panelProgramadas">
+  <h3>Recargas Programadas</h3>
+  <div id="programadasList"></div>
+</div>
+
+<div id="panelHistorial" style="display:none;">
+  <h3>Historial de Recargas Ejecutadas</h3>
+  <div id="buscadorModal">
+    <input type="text" id="buscarNumero" placeholder="🔎 Buscar número...">
+  </div>
+  <div id="historialContainer"></div>
+</div>
+
+<!-- MODAL DE RECARGA -->
+<div class="modal" id="recargaModal">
+  <div class="modal-content">
+    <span class="close" id="cerrarModal">&times;</span>
+    <h3>Recarga Masiva</h3>
+    <label for="fileInput">Subir Excel con números:</label>
+    <input type="file" id="fileInput" accept=".xlsx, .xls, .csv">
+    <label for="carrier">Carrier:</label>
+    <select id="carrier">
+      <option value="Telcel">Telcel</option>
+      <option value="AT&T">AT&T</option>
+      <option value="Movistar">Movistar</option>
+    </select>
+    <label for="tipoRecarga">Tipo de recarga:</label>
+    <select id="tipoRecarga">
+      <option value="Recarga">Recarga</option>
+      <option value="PaqueteDatos">Paquete de datos</option>
+    </select>
+    <label for="monto">Monto / Paquete:</label>
+    <select id="monto">
+      <option value="50">$50</option>
+      <option value="100">$100</option>
+      <option value="200">$200</option>
+      <option value="500">$500</option>
+    </select>
+    <label><input type="checkbox" id="programarCheck"> Programar recarga</label>
+    <input type="datetime-local" id="fechaProgramada" style="display:none;">
+    <button id="iniciarRecargaBtn">Iniciar Recarga</button>
+    <div class="progress-container" id="progressContainer">
+      <div class="progress-bar" id="progressBar"></div>
+    </div>
+    <div class="summary-cards" id="summaryCards" style="display:none;">
+      <div class="card ok"><h3 id="exitosCount">0</h3>Éxitos</div>
+      <div class="card error"><h3 id="erroresCount">0</h3>Errores</div>
+      <div class="card dup"><h3 id="duplicadosCount">0</h3>Duplicados</div>
+    </div>
+    <button id="descargarBtn" style="display:none;">⬇ Descargar Resultados de este archivo</button>
+  </div>
+</div>
+
+<!-- MODAL DE USUARIOS -->
+<div class="modal" id="usuariosModal">
+  <div class="modal-content">
+    <span class="close" id="cerrarUsuariosModal">&times;</span>
+    <h3>👤 Administrar Usuarios</h3>
+    <button id="agregarUsuarioBtn">+ Agregar Usuario</button>
+    <div id="usuariosAdminList" style="margin-top:15px;"></div>
+  </div>
+</div>
+
+<!-- BOTÓN FLOTANTE CERRAR SESIÓN -->
+<button id="logoutBtn">🔓 Cerrar Sesión</button>
+
+<script>
+// ---------- USUARIOS ----------
+let users = JSON.parse(localStorage.getItem("users")) || [{username:"admin", password:btoa("admin"), role:"admin", disabled:false}];
+let currentUser = null;
+
+// ---------- LOGIN ----------
+document.getElementById("loginBtn").addEventListener("click", ()=>{
+  const u = document.getElementById("username").value.trim();
+  const p = btoa(document.getElementById("password").value.trim());
+  const found = users.find(x=>x.username===u && x.password===p && !x.disabled);
+  if(found){
+    currentUser=found;
+    document.getElementById("loginContainer").style.display="none";
+    document.getElementById("mainContainer").style.display="block";
+    document.getElementById("logoutBtn").style.display="block";
+    if(found.role==="admin"){ document.getElementById("adminPanel").style.display="block"; document.getElementById("adminStats").style.display="block";}
+  } else { document.getElementById("loginError").style.display="block";}
+});
+
+// ---------- LOGOUT ----------
+document.getElementById("logoutBtn").addEventListener("click", ()=>{
+  if(confirm("¿Deseas cerrar sesión?")){
+    currentUser=null;
+    document.getElementById("mainContainer").style.display="none";
+    document.getElementById("loginContainer").style.display="flex";
+    document.getElementById("username").value="";
+    document.getElementById("password").value="";
+    document.getElementById("logoutBtn").style.display="none";
+  }
+});
+
+// ---------- MODAL DE USUARIOS ----------
+document.getElementById("crearUsuarioBtn").addEventListener("click", ()=>{
+  actualizarUsuariosModal();
+  document.getElementById("usuariosModal").style.display="flex";
+});
+document.getElementById("cerrarUsuariosModal").addEventListener("click", ()=>{
+  document.getElementById("usuariosModal").style.display="none";
+});
+window.addEventListener("click", (e)=>{ if(e.target==document.getElementById("usuariosModal")) document.getElementById("usuariosModal").style.display="none"; });
+
+// ---------- FUNCIONES USUARIOS ----------
+function actualizarUsuariosModal(){
+  const div = document.getElementById("usuariosAdminList");
+  div.innerHTML="";
+  users.forEach((u,index)=>{
+    const userDiv = document.createElement("div");
+    const estado = u.disabled?"Deshabilitado":"Habilitado";
+    userDiv.innerHTML=`
+      <span>${u.username} (${u.role}) <span style="color:${u.disabled?'red':'green'};">[${estado}]</span></span>
+      <div>
+        <input type="password" placeholder="Nueva contraseña" id="pass_${index}">
+        <button onclick="editarPassword(${index})">Guardar</button>
+        <button onclick="toggleUsuario(${index})">${u.disabled?'Habilitar':'Deshabilitar'}</button>
+        <button onclick="eliminarUsuarioModal(${index})">Eliminar</button>
+      </div>`;
+    div.appendChild(userDiv);
+  });
+}
+
+document.getElementById("agregarUsuarioBtn").addEventListener("click", ()=>{
+  const username = prompt("Nombre de usuario:");
+  const password = prompt("Contraseña:");
+  const role = prompt("Rol (admin/user)","user");
+  if(username && password){
+    users.push({username,password:btoa(password),role,disabled:false});
+    localStorage.setItem("users", JSON.stringify(users));
+    actualizarUsuariosModal();
+  }
+});
+
+function editarPassword(index){
+  const input = document.getElementById(`pass_${index}`);
+  if(input.value){
+    users[index].password=btoa(input.value);
+    localStorage.setItem("users", JSON.stringify(users));
+    alert("Contraseña actualizada");
+    input.value="";
+  } else alert("Ingrese una contraseña válida");
+}
+
+function toggleUsuario(index){
+  users[index].disabled = !users[index].disabled;
+  localStorage.setItem("users", JSON.stringify(users));
+  actualizarUsuariosModal();
+}
+
+function eliminarUsuarioModal(index){
+  if(confirm("¿Seguro que deseas eliminar este usuario?")){
+    users.splice(index,1);
+    localStorage.setItem("users", JSON.stringify(users));
+    actualizarUsuariosModal();
+  }
+}
+
+// ---------- RECARGAS MASIVAS ----------
+let numeros=[], numerosUnicos=[], resultados=[], recargasProgramadas=[], historialEjecutadas=[], archivoActual="";
+let paginaActual = 1;
+const ITEMS_POR_PAGINA = 5;
+
+// ---------- MODAL RECARGA ----------
+const modal = document.getElementById("recargaModal");
+document.getElementById("nuevaRecargaBtn").addEventListener("click", ()=>{
+  numeros=[]; numerosUnicos=[]; resultados=[]; archivoActual="";
+  document.getElementById('fileInput').value='';
+  document.getElementById("progressBar").style.width="0%";
+  document.getElementById("summaryCards").style.display="none";
+  document.getElementById("descargarBtn").style.display="none";
+  modal.style.display="flex";
+});
+document.getElementById("cerrarModal").addEventListener("click", ()=>{ modal.style.display="none"; });
+window.addEventListener("click", (e)=>{ if(e.target==modal) modal.style.display="none"; });
+
+// ---------- CARGA EXCEL ----------
+document.getElementById('fileInput').addEventListener('change', function(e){
+  const file = e.target.files[0]; if(!file) return;
+  archivoActual = file.name;
+  const reader = new FileReader();
+  reader.onload = function(e){
+    const data = new Uint8Array(e.target.result);
+    const workbook = XLSX.read(data,{type:'array'});
+    const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+    const jsonData = XLSX.utils.sheet_to_json(firstSheet,{header:1});
+    numeros = jsonData.map(row=>row[0]).filter(v=>v && /^\d+$/.test(v));
+    const seen = new Set(), duplicados=[];
+    numerosUnicos=[];
+    numeros.forEach(num=>{ if(seen.has(num)) duplicados.push(num); else {seen.add(num); numerosUnicos.push(num);} });
+    alert(`Archivo cargado: ${numerosUnicos.length} únicos, ${duplicados.length} duplicados ignorados.`);
+    document.getElementById("duplicadosCount").textContent = duplicados.length;
+    document.getElementById("exitosCount").textContent=0;
+    document.getElementById("erroresCount").textContent=0;
+    document.getElementById("summaryCards").style.display="flex";
+  };
+  reader.readAsArrayBuffer(file);
+});
+
+// ---------- INICIAR RECARGA ----------
+document.getElementById("iniciarRecargaBtn").addEventListener("click", ()=>{
+  const carrier=document.getElementById('carrier').value;
+  const tipoRecarga=document.getElementById('tipoRecarga').value;
+  const monto=document.getElementById('monto').value;
+  if(!numerosUnicos.length){ alert("Sube un archivo primero"); return; }
+
+  if(document.getElementById("programarCheck").checked && document.getElementById("fechaProgramada").value){
+    const fecha = new Date(document.getElementById("fechaProgramada").value);
+    if(fecha<=new Date()){ alert("La fecha debe ser futura."); return; }
+    const grupoId = Date.now() + Math.random();
+    recargasProgramadas.push({id:grupoId,carrier,tipoRecarga,monto,numeros:numerosUnicos,fecha,GrupoID:grupoId});
+    numerosUnicos.forEach(num => {
+      historialEjecutadas.push({Número:num,Carrier:carrier,Tipo:tipoRecarga,Monto:monto,Estado:"Programada",Fecha:fecha.toLocaleString(),Archivo:archivoActual,FechaProgramada:true,GrupoID:grupoId});
+    });
+    actualizarListaProgramadas();
+    actualizarHistorialVisual();
+    const diff = fecha - new Date();
+    setTimeout(()=>{
+      const resultadosEjecutados = numerosUnicos.map(num => {
+        const exito = Math.random() > 0.3;
+        return {Número:num,Carrier:carrier,Tipo:tipoRecarga,Monto:monto,Estado:exito?"Éxito":"Error",Fecha:new Date().toLocaleString(),Archivo:archivoActual,FechaProgramada:true,GrupoID:grupoId};
+      });
+      historialEjecutadas = historialEjecutadas.filter(r=>r.GrupoID!==grupoId);
+      historialEjecutadas.push(...resultadosEjecutados);
+      recargasProgramadas = recargasProgramadas.filter(r=>r.id!==grupoId);
+      actualizarListaProgramadas();
+      actualizarHistorialVisual();
+      actualizarStats();
+      alert(`✅ Recarga programada ejecutada. Revisa el Historial de Recargas.`);
+    }, diff);
+    alert(`Recarga programada para ${fecha.toLocaleString()}`);
+    modal.style.display="none";
+  } else {
+    ejecutarRecarga(carrier,tipoRecarga,monto,numerosUnicos,false);
+  }
+});
+
+// ---------- FUNCIONES RECARGA ----------
+function ejecutarRecarga(carrier,tipoRecarga,monto,numerosAEjecutar,programada=false, grupoId=null){
+  const total = numerosAEjecutar.length;
+  const progressBar = document.getElementById("progressBar");
+  document.getElementById("progressContainer").style.display="block";
+  let exitos=0, errores=0, index=0;
+  if(!grupoId) grupoId = Date.now() + Math.random();
+  const interval = setInterval(()=>{
+    if(index<total){
+      const numero=numerosAEjecutar[index];
+      const exito=Math.random()>0.3;
+      if(exito) exitos++; else errores++;
+      const resultado={Número:numero,Carrier:carrier,Tipo:tipoRecarga,Monto:monto,Estado:exito?"Éxito":"Error",Fecha:new Date().toLocaleString(),Archivo:archivoActual,FechaProgramada:programada,GrupoID:grupoId};
+      resultados.push(resultado);
+      historialEjecutadas.push(resultado);
+      progressBar.style.width=((index+1)/total*100)+"%";
+      document.getElementById("exitosCount").textContent = exitos;
+      document.getElementById("erroresCount").textContent = errores;
+      index++;
+    } else { 
+      clearInterval(interval); 
+      document.getElementById("descargarBtn").style.display="block"; 
+      actualizarHistorialVisual();
+      actualizarStats();
+      alert(`✅ Recarga completada. Puedes revisar el estatus en el Historial de Recargas.`);
+    }
+  },100);
+}
+
+// ---------- LISTA PROGRAMADAS ----------
+function actualizarListaProgramadas(){
+  const div = document.getElementById("programadasList");
+  div.innerHTML="";
+  recargasProgramadas.forEach(r=>{
+    const p=document.createElement("div"); p.className="historial-item";
+    p.innerHTML=`<span>${r.carrier} - ${r.tipoRecarga} - $${r.monto} - ${r.fecha.toLocaleString()}</span>
+                 <button class="cancelBtn" onclick="cancelarProgramada(${r.id})">Cancelar</button>`;
+    div.appendChild(p);
+  });
+}
+function cancelarProgramada(id){ recargasProgramadas = recargasProgramadas.filter(r=>r.id!==id); actualizarListaProgramadas(); }
+
+// ---------- TABS ----------
+document.getElementById("tabProgramadasBtn").addEventListener("click", ()=>{
+  document.getElementById("panelProgramadas").style.display="block";
+  document.getElementById("panelHistorial").style.display="none";
+  document.getElementById("tabProgramadasBtn").classList.add("active");
+  document.getElementById("tabHistorialBtn").classList.remove("active");
+});
+document.getElementById("tabHistorialBtn").addEventListener("click", ()=>{
+  document.getElementById("panelProgramadas").style.display="none";
+  document.getElementById("panelHistorial").style.display="block";
+  document.getElementById("tabProgramadasBtn").classList.remove("active");
+  document.getElementById("tabHistorialBtn").classList.add("active");
+  actualizarHistorialVisual();
+});
+
+// ---------- HISTORIAL ----------
+function actualizarHistorialVisual() {
+  const container = document.getElementById("historialContainer");
+  container.innerHTML = "";
+  const buscarNumero = document.getElementById("buscarNumero").value.trim();
+
+  const grupos = [];
+  const idMap = {};
+  historialEjecutadas.forEach(r=>{
+    if(!idMap[r.GrupoID]) { idMap[r.GrupoID] = {archivo:r.Archivo, tipo:r.FechaProgramada?"Programada":"Inmediata", carrier:r.Carrier, items:[]}; grupos.push(idMap[r.GrupoID]); }
+    idMap[r.GrupoID].items.push(r);
+  });
+
+  const gruposFiltrados = grupos.filter(grupo=>{
+    if(!buscarNumero) return true;
+    return grupo.items.some(i => String(i.Número).includes(buscarNumero));
+  });
+
+  const totalPaginas = Math.ceil(gruposFiltrados.length / ITEMS_POR_PAGINA);
+  if(paginaActual>totalPaginas) paginaActual=totalPaginas || 1;
+  const start = (paginaActual - 1) * ITEMS_POR_PAGINA;
+  const end = start + ITEMS_POR_PAGINA;
+  const gruposPagina = gruposFiltrados.slice(start, end);
+
+  gruposPagina.forEach(grupo => {
+    const card = document.createElement("div");
+    card.className = "historialCard " + 
+      (grupo.carrier==="Telcel"?"carrier-telcel":grupo.carrier==="AT&T"?"carrier-att":"carrier-movistar");
+    const icono = grupo.tipo==="Programada"?"⏰":"🟢";
+    const exitos = grupo.items.filter(i=>i.Estado==="Éxito").length;
+    const errores = grupo.items.filter(i=>i.Estado==="Error").length;
+    const duplicados = grupo.items.filter(i=>i.Estado==="Duplicado").length;
+
+    const detallesHTML = `
+      <table style="width:100%; border-collapse:collapse;">
+        <thead>
+          <tr>
+            <th style="border-bottom:1px solid #ccc; padding:5px">Número</th>
+            <th style="border-bottom:1px solid #ccc; padding:5px">Carrier</th>
+            <th style="border-bottom:1px solid #ccc; padding:5px">Tipo</th>
+            <th style="border-bottom:1px solid #ccc; padding:5px">Monto</th>
+            <th style="border-bottom:1px solid #ccc; padding:5px">Estado</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${grupo.items.map(i=>{
+            let numeroMostrado = String(i.Número);
+            if(buscarNumero && numeroMostrado.includes(buscarNumero)){
+              numeroMostrado = `<span class="resaltado">${numeroMostrado}</span>`;
+            }
+            let colorEstado = i.Estado==="Éxito"?"#27ae60":i.Estado==="Error"?"#e74c3c":"#f39c12";
+            return `<tr>
+              <td style="padding:5px">${numeroMostrado}</td>
+              <td style="padding:5px">${i.Carrier}</td>
+              <td style="padding:5px">${i.Tipo}</td>
+              <td style="padding:5px">$${i.Monto}</td>
+              <td style="padding:5px; color:${colorEstado}; font-weight:bold;">${i.Estado}</td>
+            </tr>`;
+          }).join('')}
+        </tbody>
+      </table>
+    `;
+
+    card.innerHTML = `<h4>${icono} ${grupo.archivo} - ${grupo.tipo} - ${grupo.carrier}</h4>
+      <p>Total: ${grupo.items.length} | ✅ ${exitos} | ❌ ${errores} | ⚠ ${duplicados}</p>
+      <button onclick="toggleDetalles(this)">Ver detalles</button>
+      <button onclick='descargarResultados(${JSON.stringify(grupo.items)})'>⬇ Descargar</button>
+      <div class="detalles">${detallesHTML}</div>`;
+
+    container.appendChild(card);
+  });
+
+  const paginacionDiv = document.createElement("div");
+  paginacionDiv.style.textAlign = "center";
+  paginacionDiv.style.marginTop = "10px";
+
+  const btnPrev = document.createElement("button");
+  btnPrev.textContent = "⬅ Anterior";
+  btnPrev.disabled = paginaActual === 1;
+  btnPrev.className="paginationBtn";
+  btnPrev.onclick = () => { paginaActual--; actualizarHistorialVisual(); };
+
+  const btnNext = document.createElement("button");
+  btnNext.textContent = "Siguiente ➡";
+  btnNext.disabled = paginaActual === totalPaginas || totalPaginas === 0;
+  btnNext.className="paginationBtn";
+  btnNext.onclick = () => { paginaActual++; actualizarHistorialVisual(); };
+
+  const pageInfo = document.createElement("span");
+  pageInfo.textContent = ` Página ${paginaActual} de ${totalPaginas} `;
+  pageInfo.style.margin = "0 10px";
+
+  paginacionDiv.appendChild(btnPrev);
+  paginacionDiv.appendChild(pageInfo);
+  paginacionDiv.appendChild(btnNext);
+
+  container.appendChild(paginacionDiv);
+}
+
+// ---------- FUNCIONES AUX ----------
+function toggleDetalles(btn){
+  const div = btn.nextElementSibling.nextElementSibling;
+  div.style.display = div.style.display === "none" ? "block" : "none";
+}
+function descargarResultados(items){
+  const wb = XLSX.utils.book_new();
+  const ws = XLSX.utils.json_to_sheet(items);
+  XLSX.utils.book_append_sheet(wb, ws, "Resultados");
+  const nombre = items[0].Archivo.replace(/\.[^/.]+$/,"") + "_" + (items[0].FechaProgramada?"programada":"inmediata") + "_resultados.xlsx";
+  XLSX.writeFile(wb, nombre);
+}
+
+// ---------- BUSCADOR ----------
+document.getElementById("buscarNumero").addEventListener("input", ()=>{ paginaActual=1; actualizarHistorialVisual(); });
+
+// ---------- ACTUALIZAR ESTADÍSTICAS ----------
+function actualizarStats(){
+  const tel = historialEjecutadas.filter(r=>r.Carrier==="Telcel" && r.Estado==="Éxito").length;
+  const att = historialEjecutadas.filter(r=>r.Carrier==="AT&T" && r.Estado==="Éxito").length;
+  const mov = historialEjecutadas.filter(r=>r.Carrier==="Movistar" && r.Estado==="Éxito").length;
+  document.getElementById("totalTelcel").textContent = tel;
+  document.getElementById("totalATT").textContent = att;
+  document.getElementById("totalMovistar").textContent = mov;
+}
+
+// ---------- PROGRAMAR CHECKBOX ----------
+document.getElementById("programarCheck").addEventListener("change", (e)=>{
+  document.getElementById("fechaProgramada").style.display = e.target.checked ? "block" : "none";
+});
+</script>
+</body>
+</html>
